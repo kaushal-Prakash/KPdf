@@ -20,7 +20,6 @@ public class PdfViewer {
     private final VBox pages = new VBox(10);
     {
         pages.setStyle("-fx-alignment: center;");
-        pages.setStyle("-fx-background-color: #2b2b2b;");
         pages.setPadding(new Insets(20));
     }
     private final ScrollPane scrollPane = new ScrollPane(pages);
@@ -57,8 +56,10 @@ public class PdfViewer {
         fitWidthBtn.setOnAction(e -> fitWidth());
 
         scrollPane.setPannable(true);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
+        scrollPane.setFitToWidth(false);
+        scrollPane.setFitToHeight(false);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 
         scrollPane.viewportBoundsProperty().addListener((obs, oldVal, newVal) -> {
             for (var node : pages.getChildren()) {
@@ -78,6 +79,11 @@ public class PdfViewer {
                 event.consume();
             }
         });
+
+        scrollPane.viewportBoundsProperty().addListener((obs, oldVal, newVal) -> {
+            updatePageSizes(newVal.getWidth());
+        });
+
     }
 
     public Parent getRoot() {
@@ -107,20 +113,18 @@ public class PdfViewer {
     private void renderAllPages() throws Exception {
         pages.getChildren().clear();
 
-        double viewportWidth = scrollPane.getViewportBounds().getWidth() - 40;
-
         for (int i = 0; i < document.getNumberOfPages(); i++) {
             BufferedImage img = renderer.renderPage(i);
 
             if (inverted) img = ImageUtils.invert(img);
 
             ImageView view = new ImageView(SwingFXUtils.toFXImage(img, null));
-
             view.setPreserveRatio(true);
-            view.setFitWidth(viewportWidth);
 
             pages.getChildren().add(view);
         }
+
+        updatePageSizes(scrollPane.getViewportBounds().getWidth());
     }
 
     private void toggleInvert() {
@@ -138,4 +142,16 @@ public class PdfViewer {
         pages.setScaleY(zoom);
 
     }
+
+    private void updatePageSizes(double width) {
+        double targetWidth = width - 40;
+
+        for (var node : pages.getChildren()) {
+            if (node instanceof ImageView iv) {
+                iv.setPreserveRatio(true);
+                iv.setFitWidth(targetWidth);
+            }
+        }
+    }
+
 }
