@@ -1,62 +1,62 @@
-/* Base Dark Theme */
+/* Base settings */
 .root {
-    -fx-base: #2b2b2b;
-    -fx-control-inner-background: #2b2b2b;
-    -fx-background-color: #2b2b2b;
     -fx-font-family: 'Segoe UI', sans-serif;
     -fx-font-size: 14px;
+    -fx-base: #2b2b2b;              /* Dark base color */
+    -fx-background-color: #2b2b2b;  /* Ensure window bg is dark */
 }
 
 /* Toolbar */
 .main-toolbar {
-    -fx-background-color: #3c3f41;
+    -fx-background-color: #333333;
     -fx-padding: 10px;
-    -fx-spacing: 10px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 10, 0, 0, 0);
+    -fx-spacing: 15px; /* Increased spacing */
+    -fx-alignment: center-left;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 0, 0, 10, 0);
 }
 
 .button {
-    -fx-background-color: #4c5052;
-    -fx-text-fill: #bbbbbb;
-    -fx-background-radius: 4;
+    -fx-background-color: #444;
+    -fx-text-fill: #ddd;
     -fx-cursor: hand;
+    -fx-padding: 5 15;
+}
+.button:hover { -fx-background-color: #666; -fx-text-fill: white; }
+
+/* FIX 1: Zoom Label Visibility */
+.zoom-label {
+    -fx-text-fill: #ffffff; /* Force white text */
+    -fx-font-weight: bold;
+    -fx-min-width: 50px;
+    -fx-alignment: center;
 }
 
-.button:hover {
-    -fx-background-color: #5c6164;
-    -fx-text-fill: white;
-}
-
-.button:pressed {
-    -fx-background-color: #365880;
-}
-
-/* ScrollPane & Viewport */
+/* FIX 2: Remove White Regions from ScrollPane */
 .pdf-scroll-pane {
+    -fx-background: transparent;
     -fx-background-color: transparent;
-    -fx-padding: 0;
 }
 
 .pdf-scroll-pane > .viewport {
-    -fx-background-color: #2b2b2b;
+    -fx-background-color: transparent; /* This allows the VBox color to show through */
 }
 
 /* Scrollbars */
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
 }
-.scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb {
-    -fx-background-color: #555555;
+.scroll-bar .thumb {
+    -fx-background-color: #666;
     -fx-background-radius: 5em;
 }
 
-/* Status Bar */
-.status-bar {
-    -fx-background-color: #3c3f41;
-    -fx-border-color: #323232;
-    -fx-border-width: 1 0 0 0;
-}
-
-.label {
-    -fx-text-fill: #a9b7c6;
+/* Page Counter Badge */
+.page-counter {
+    -fx-background-color: rgba(0, 0, 0, 0.7);
+    -fx-text-fill: white;
+    -fx-padding: 8px 15px;
+    -fx-background-radius: 20px;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 0, 2);
 }
