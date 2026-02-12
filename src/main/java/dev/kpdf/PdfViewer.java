@@ -18,6 +18,9 @@ public class PdfViewer {
 
     private final BorderPane root = new BorderPane();
     private final VBox pages = new VBox(10);
+    {
+        pages.setStyle("-fx-alignment: center;");
+    }
     private final ScrollPane scrollPane = new ScrollPane(pages);
 
     private PDDocument document;
@@ -33,6 +36,13 @@ public class PdfViewer {
         Button openBtn = new Button("Open");
         Button invertBtn = new Button("Invert");
         Button fitWidthBtn = new Button("Fit Width");
+        Button fullBtn = new Button("Fullscreen");
+        toolBar.getItems().add(fullBtn);
+
+        fullBtn.setOnAction(e ->
+                stage.setFullScreen(!stage.isFullScreen())
+        );
+
 
         toolBar.getItems().addAll(openBtn, invertBtn, fitWidthBtn);
 
@@ -43,6 +53,10 @@ public class PdfViewer {
         openBtn.setOnAction(e -> openPdf(stage));
         invertBtn.setOnAction(e -> toggleInvert());
         fitWidthBtn.setOnAction(e -> fitWidth());
+
+        scrollPane.setPannable(true);
+        scrollPane.setFitToWidth(false);
+        scrollPane.setFitToHeight(false);
 
         scrollPane.setOnScroll(event -> {
             if (event.isControlDown()) {
@@ -106,5 +120,6 @@ public class PdfViewer {
         zoom = scrollPane.getWidth() / pages.getWidth();
         pages.setScaleX(zoom);
         pages.setScaleY(zoom);
+
     }
 }
