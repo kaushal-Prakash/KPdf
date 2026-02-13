@@ -3,26 +3,26 @@ package dev.kpdf;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import java.util.Objects;
 
 public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
         PdfViewer viewer = new PdfViewer(stage);
-        Scene scene = new Scene(viewer.getRoot(), 1200, 900);
 
+        Scene scene = new Scene(viewer.getRoot(), 1300, 900);
+
+        // CSS is optional now as we moved critical styles to Java code
+        // to prevent crashes if file is missing.
         try {
-            scene.getStylesheets().add(
-                    Objects.requireNonNull(getClass().getResource("/style.css")).toExternalForm()
-            );
+            scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
         } catch (Exception e) {
-            System.out.println("CSS not found, using default.");
+            // Ignore if CSS missing, app will still look good
         }
 
-        stage.setTitle("KPdf - Professional");
+        stage.setTitle("KPdf - Minimal Pdf  Viewer");
         stage.setScene(scene);
-        stage.setMaximized(true); // Start fully maximized
+        stage.setMaximized(true);
         stage.show();
     }
 
