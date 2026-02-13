@@ -32,13 +32,17 @@ public class PdfViewer {
     private final VBox pagesContainer = new VBox(20);
     private final ScrollPane scrollPane = new ScrollPane(pagesContainer);
 
-    // UI
+    // UI Elements
     private final Label pageCounterLabel = new Label("Page 0 / 0");
     private final ProgressBar progressBar = new ProgressBar(0);
     private final VBox loadingOverlay = new VBox(10, new ProgressIndicator(), new Label("Processing..."));
     private final Label zoomLbl = new Label("100%");
 
-    // Core
+    // New UI Elements
+    private final TextField pageInput = new TextField();
+    private final Label totalPagesLbl = new Label("/ 0");
+
+    // Logic
     private PDDocument document;
     private PdfRendererService renderer;
     private final ExecutorService renderExecutor = Executors.newFixedThreadPool(2);
@@ -47,6 +51,7 @@ public class PdfViewer {
     private final DoubleProperty zoomFactor = new SimpleDoubleProperty(1.0);
     private boolean isDarkFilterActive = false;
     private int totalPages = 0;
+    private int currentRotation = 0; // 0, 90, 180, 270
 
     public PdfViewer(Stage stage) {
         setupUI(stage);
@@ -62,21 +67,42 @@ public class PdfViewer {
         ToolBar toolBar = new ToolBar();
         toolBar.setStyle("-fx-background-color: #333; -fx-padding: 10px; -fx-spacing: 15px;");
 
-        Button btnOpen = createStyledButton("Open PDF");
+        Button btnOpen = createStyledButton("Open");
         Button btnInvert = createStyledButton("Dark Mode");
+        Button btnRotate = createStyledButton("Rotate ⟳");
+
         Button btnZoomOut = createStyledButton("-");
         Button btnZoomIn = createStyledButton("+");
         Button btnFitWidth = createStyledButton("Fit Width");
 
+        // Zoom Label Style
         zoomLbl.setTextFill(Color.WHITE);
         zoomLbl.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        zoomLbl.setMinWidth(60);
+        zoomLbl.setMinWidth(50);
         zoomLbl.setAlignment(Pos.CENTER);
+
+        // Page Navigation
+        HBox navBox = new HBox(5);
+        navBox.setAlignment(Pos.CENTER);
+        pageInput.setPrefWidth(50);
+        pageInput.setStyle("-fx-background-color: #444; -fx-text-fill: white; -fx-alignment: center;");
+        totalPagesLbl.setTextFill(Color.LIGHTGRAY);
+        navBox.getChildren().addAll(new Label("Go to:"), pageInput, totalPagesLbl);
+        ((Label)navBox.getChildren().get(0)).setTextFill(Color.LIGHTGRAY);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        toolBar.getItems().addAll(btnOpen, btnInvert, spacer, btnZoomOut, zoomLbl, btnZoomIn, btnFitWidth);
+        toolBar.getItems().addAll(
+                btnOpen,
+                new Separator(),
+                btnInvert,
+                btnRotate,
+                new Separator(),
+                btnZoomOut, zoomLbl, btnZoomIn, btnFitWidth,
+                spacer,
+                navBox
+        );
 
         // Layout
         pagesContainer.setAlignment(Pos.TOP_CENTER);
@@ -118,9 +144,19 @@ public class PdfViewer {
         btnInvert.setOnAction(e -> {
             isDarkFilterActive = !isDarkFilterActive;
             updateBackgroundStyle();
-            // Important: We must re-render to apply pixel-perfect dark mode
             if (document != null) renderPagesAsync();
         });
+
+        // ROTATE ACTION
+        btnRotate.setOnAction(e -> {
+            if (document == null) return;
+            currentRotation = (currentRotation + 90) % 360;
+            renderer.rotateAllPages(currentRotation);
+            renderPagesAsync(); // Re-render to update layout and orientation
+        });
+
+        // GO TO PAGE ACTION
+        pageInput.setOnAction(e -> goToPage());
 
         zoomFactor.addListener((obs, oldVal, newVal) -> {
             zoomLbl.setText(String.format("%.0f%%", newVal.doubleValue() * 100));
@@ -130,7 +166,7 @@ public class PdfViewer {
 
     private Button createStyledButton(String text) {
         Button btn = new Button(text);
-        btn.setStyle("-fx-background-color: #444; -fx-text-fill: #ddd; -fx-cursor: hand;");
+        btn.setStyle("-fx-background-color: #444; -fx-text-fill: #ddd; -fx-cursor: hand; -fx-font-weight: bold;");
         btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: #666; -fx-text-fill: white;"));
         btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: #444; -fx-text-fill: #ddd;"));
         return btn;
@@ -147,16 +183,48 @@ public class PdfViewer {
         scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
             if (totalPages > 0) {
                 int page = (int) Math.round(newVal.doubleValue() * (totalPages - 1)) + 1;
+                // Update Badge
                 pageCounterLabel.setText("Page " + Math.max(1, Math.min(page, totalPages)) + " / " + totalPages);
+                // Update Text Input (only if not focused to avoid interrupting typing)
+                if (!pageInput.isFocused()) {
+                    pageInput.setText(String.valueOf(Math.max(1, Math.min(page, totalPages))));
+                }
             }
         });
 
-        // Auto-fit on resize
         scrollPane.viewportBoundsProperty().addListener((obs, old, newBounds) -> {
             if (document != null && Math.abs(old.getWidth() - newBounds.getWidth()) > 10) {
                 // Optional: fitToWidth();
             }
         });
+    }
+
+    private void goToPage() {
+        if (totalPages == 0) return;
+        try {
+            int targetPage = Integer.parseInt(pageInput.getText());
+            if (targetPage < 1) targetPage = 1;
+            if (targetPage > totalPages) targetPage = totalPages;
+
+            // Calculate scroll position
+            // Since pages vary in height (especially if mixed portrait/landscape),
+            // the most accurate way is to find the node's position.
+            if (!pagesContainer.getChildren().isEmpty()) {
+                double targetY = pagesContainer.getChildren().get(targetPage - 1).getBoundsInParent().getMinY();
+                double totalHeight = pagesContainer.getBoundsInLocal().getHeight();
+                double viewHeight = scrollPane.getViewportBounds().getHeight();
+
+                // VValue is 0.0 to 1.0
+                double vValue = targetY / (totalHeight - viewHeight);
+                scrollPane.setVvalue(vValue);
+            }
+
+            // Unfocus field
+            root.requestFocus();
+
+        } catch (NumberFormatException ex) {
+            pageInput.setText("1");
+        }
     }
 
     private void updateBackgroundStyle() {
@@ -176,6 +244,7 @@ public class PdfViewer {
         loadingOverlay.setVisible(true);
         pagesContainer.getChildren().clear();
         progressBar.setVisible(true);
+        currentRotation = 0; // Reset rotation on new file
 
         Task<PDDocument> loadTask = new Task<>() {
             @Override
@@ -188,7 +257,11 @@ public class PdfViewer {
             this.document = loadTask.getValue();
             this.renderer = new PdfRendererService(document);
             this.totalPages = document.getNumberOfPages();
+
             pageCounterLabel.setText("Page 1 / " + totalPages);
+            totalPagesLbl.setText("/ " + totalPages);
+            pageInput.setText("1");
+
             renderPagesAsync();
         });
 
@@ -201,40 +274,47 @@ public class PdfViewer {
     }
 
     private void renderPagesAsync() {
-        // Reuse existing placeholders if available (prevents UI flicker)
-        List<ImageView> views;
-        boolean firstLoad = pagesContainer.getChildren().isEmpty();
-
-        if (firstLoad) {
-            views = new ArrayList<>();
-            for (int i = 0; i < totalPages; i++) {
-                ImageView iv = new ImageView();
-                iv.setPreserveRatio(true);
-                iv.setFitWidth(800);
-                PDRectangle box = document.getPage(i).getMediaBox();
-                iv.setFitHeight(800 * (box.getHeight() / box.getWidth()));
-                views.add(iv);
-            }
-            pagesContainer.getChildren().setAll(views);
-            loadingOverlay.setVisible(false);
-            fitToWidth();
-        } else {
-            // Cast existing children to ImageView list
-            views = new ArrayList<>();
-            for(var node : pagesContainer.getChildren()) views.add((ImageView) node);
-            progressBar.setVisible(true); // Show progress for re-render
+        // Reuse placeholders or clear
+        if (!pagesContainer.getChildren().isEmpty()) {
+            pagesContainer.getChildren().clear();
         }
 
-        // Render Task
+        List<ImageView> imageViews = new ArrayList<>();
+
+        for (int i = 0; i < totalPages; i++) {
+            ImageView iv = new ImageView();
+            iv.setPreserveRatio(true);
+            iv.setFitWidth(800);
+
+            // Calculate Placeholder Size with Rotation awareness
+            PDRectangle box = document.getPage(i).getMediaBox();
+
+            // Check effective rotation (Document rotation + Page rotation)
+            // But since we updated all pages via rotateAllPages(), checking currentRotation is enough
+            boolean isLandscape = (currentRotation == 90 || currentRotation == 270);
+
+            double w = isLandscape ? box.getHeight() : box.getWidth();
+            double h = isLandscape ? box.getWidth() : box.getHeight();
+
+            double ratio = h / w;
+            iv.setFitHeight(800 * ratio);
+
+            imageViews.add(iv);
+        }
+
+        pagesContainer.getChildren().addAll(imageViews);
+        loadingOverlay.setVisible(false);
+        fitToWidth();
+        progressBar.setVisible(true);
+
         Task<Void> renderTask = new Task<>() {
             @Override
             protected Void call() {
                 for (int i = 0; i < totalPages; i++) {
                     if (isCancelled()) break;
                     final int index = i;
-                    final ImageView target = views.get(index);
+                    final ImageView target = imageViews.get(index);
                     try {
-                        // Pass 'isDarkFilterActive' to renderer for robust pixel inversion
                         BufferedImage img = renderer.renderPage(index, 2.0f, isDarkFilterActive);
                         javafx.scene.image.Image fxImg = SwingFXUtils.toFXImage(img, null);
 
@@ -243,9 +323,7 @@ public class PdfViewer {
                             target.setFitHeight(-1);
                             updatePageWidth(target);
 
-                            // Remove any old effects since we bake the color in
                             target.setEffect(isDarkFilterActive ? null : new DropShadow(10, Color.rgb(0,0,0,0.5)));
-
                             progressBar.setProgress((double)(index + 1) / totalPages);
                             if(index == totalPages -1) progressBar.setVisible(false);
                         });
@@ -274,11 +352,8 @@ public class PdfViewer {
 
     private void fitToWidth() {
         if(pagesContainer.getChildren().isEmpty()) return;
-
         double scrollWidth = scrollPane.getViewportBounds().getWidth();
         if(scrollWidth > 0) {
-            // Precise fit: Viewport Width - Padding (60px)
-            // Normalized against our base width (800)
             zoomFactor.set((scrollWidth - 60) / 800.0);
         }
     }

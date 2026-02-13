@@ -20,7 +20,7 @@ public class Main extends Application {
             // Ignore if CSS missing, app will still look good
         }
 
-        stage.setTitle("KPdf - Minimal Pdf  Viewer");
+        stage.setTitle("KPdf - Minimal Pdf Viewer");
         stage.setScene(scene);
         stage.setMaximized(true);
         stage.show();
