@@ -35,7 +35,7 @@ public class PdfViewer {
     private final Label pageCounterLabel = new Label("Page 0 / 0");
     private final ProgressBar progressBar = new ProgressBar(0);
     private final VBox loadingOverlay = new VBox(10, new ProgressIndicator(), new Label("Processing PDF..."));
-    private final Label zoomLbl = new Label("100%"); // Defined here to access in listeners
+    private final Label zoomLbl = new Label("100%");
 
     // Logic
     private PDDocument document;
@@ -70,7 +70,6 @@ public class PdfViewer {
         Button btnZoomIn = new Button("+");
         Button btnFitWidth = new Button("Fit Width");
 
-        // Apply style class to label
         zoomLbl.getStyleClass().add("zoom-label");
 
         toolBar.getItems().addAll(
@@ -78,38 +77,42 @@ public class PdfViewer {
                 btnZoomOut, zoomLbl, btnZoomIn, btnFitWidth
         );
 
-        // --- 2. Main Scroll Area ---
+        // --- 2. Scroll Pane & Layout ---
+        // VBOX SETUP
         pagesContainer.setAlignment(Pos.TOP_CENTER);
         pagesContainer.setPadding(new Insets(30));
+        // Important: Ensure VBox fills the ScrollPane width so alignment works
+        pagesContainer.setFillWidth(true);
 
+        // SCROLLPANE SETUP
         scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true); // FIX: Ensure inner background fills height
+        scrollPane.setFitToHeight(true); // Ensures background fills height
         scrollPane.setPannable(true);
         scrollPane.getStyleClass().add("pdf-scroll-pane");
 
-        // Apply initial colors
-        updateBackgroundStyle();
-
-        // --- 3. Page Counter Badge ---
+        // --- 3. Badge & Overlay ---
         pageCounterLabel.getStyleClass().add("page-counter");
         StackPane.setAlignment(pageCounterLabel, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(pageCounterLabel, new Insets(20, 30, 20, 0));
 
-        // --- 4. Loading Overlay ---
         loadingOverlay.setAlignment(Pos.CENTER);
         loadingOverlay.setStyle("-fx-background-color: rgba(0,0,0,0.7);");
         loadingOverlay.setVisible(false);
 
-        // --- 5. Assembly ---
+        // --- 4. Root Assembly ---
         mainLayout.setTop(toolBar);
         mainLayout.setCenter(scrollPane);
         mainLayout.setBottom(progressBar);
         progressBar.setMaxWidth(Double.MAX_VALUE);
         progressBar.setVisible(false);
 
+        // Note: The background color is applied to 'root', not ScrollPane
         root.getChildren().addAll(mainLayout, pageCounterLabel, loadingOverlay);
 
-        // --- 6. Actions ---
+        // Apply Initial Background
+        updateBackgroundStyle();
+
+        // --- 5. Actions ---
         btnOpen.setOnAction(e -> openPdf(stage));
         btnZoomIn.setOnAction(e -> animateZoom(0.1));
         btnZoomOut.setOnAction(e -> animateZoom(-0.1));
@@ -145,17 +148,17 @@ public class PdfViewer {
         });
     }
 
-    // --- Styling Fixes ---
+    // --- CRITICAL FIX: Background Handling ---
 
     private void updateBackgroundStyle() {
-        // FIX: We must color the ScrollPane Viewport to remove the white box
         String color = isDarkFilterActive ? "#1e1e1e" : "#525659";
 
-        // Apply to VBox (Container)
-        pagesContainer.setStyle("-fx-background-color: " + color + "; -fx-alignment: top-center;");
+        // 1. Apply to the ROOT StackPane (Behind everything)
+        root.setStyle("-fx-background-color: " + color + ";");
 
-        // Apply to ScrollPane Viewport (The background behind the VBox)
-        scrollPane.setStyle("-fx-background: " + color + "; -fx-background-color: " + color + ";");
+        // 2. Apply to VBox (Container)
+        // We MUST re-apply alignment here because setStyle clears it
+        pagesContainer.setStyle("-fx-background-color: " + color + "; -fx-alignment: top-center;");
     }
 
     private void applyDarkFilter() {
@@ -178,7 +181,7 @@ public class PdfViewer {
         }
     }
 
-    // --- Core Logic (Unchanged) ---
+    // --- Core Logic ---
 
     private void openPdf(Stage stage) {
         FileChooser chooser = new FileChooser();
@@ -251,7 +254,11 @@ public class PdfViewer {
                             target.setFitHeight(-1);
                             updatePageWidth(target);
                             applyDarkFilterToImage(target);
-                            target.setEffect(new DropShadow(10, Color.rgb(0,0,0,0.5)));
+
+                            // Remove individual shadow in dark mode to prevent artifacts
+                            if (!isDarkFilterActive) {
+                                target.setEffect(new DropShadow(10, Color.rgb(0,0,0,0.5)));
+                            }
 
                             progressBar.setProgress((double)(index + 1) / totalPages);
                             if(index == totalPages -1) progressBar.setVisible(false);
@@ -284,6 +291,9 @@ public class PdfViewer {
     private void fitToWidth() {
         if(pagesContainer.getChildren().isEmpty()) return;
         double viewWidth = scrollPane.getViewportBounds().getWidth();
-        if(viewWidth > 0) zoomFactor.set((viewWidth - 60) / 800.0);
+        if(viewWidth > 0) {
+            // Leave 60px margin (30px padding * 2)
+            zoomFactor.set((viewWidth - 60) / 800.0);
+        }
     }
 }
